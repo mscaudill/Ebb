@@ -1,0 +1,22 @@
+# requirements for ebb's development environment
+name: ebb
+dependencies:
+  - numpy
+  - scipy
+  - matplotlib
+  - ipython
+  - notebook
+  # testing
+  - pytest
+  - pytest-cov
+    # Linting & format
+  - isort
+  - mypy
+  - pylint
+  - spyder
+  # pypi packages
+  - pip
+  - pip:
+    - codespell
+    - pytest-lazy-fixture
+    - openseize
