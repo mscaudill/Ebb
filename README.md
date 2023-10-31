@@ -1,6 +1,6 @@
 <h1 align="center">
     <img src="https://github.com/mscaudill/Ebb/blob/master/imgs/logo.png" 
-    style="width:600px;height:auto;"/>
+    style="width:500px;height:auto;"/>
 </h1>
 
 
