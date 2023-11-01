@@ -22,7 +22,7 @@ from spectraprints.core import concurrency
 from spectraprints.masking import masks
 
 
-def preprocess(epath, savedir, channels=[0, 1, 2, 3], fs=5000, M=20, fstop=60,
+def preprocess(path, savedir, channels=[0, 1, 3], fs=5000, M=25, fstop=60,
                fwidth=6, nominally=[48, 72], chunksize=30e5, axis=-1,
                returning=False, verbose=False):
     """Preprocesses and EDF file at path by constructing, notch filtering and
@@ -68,7 +68,7 @@ def preprocess(epath, savedir, channels=[0, 1, 2, 3], fs=5000, M=20, fstop=60,
 
     t0 = time.perf_counter()
 
-    epath = Path(epath)
+    epath = Path(path)
     reader = edf.Reader(epath)
     reader.channels = channels
 
@@ -93,21 +93,33 @@ def preprocess(epath, savedir, channels=[0, 1, 2, 3], fs=5000, M=20, fstop=60,
     notch = iir.Notch(fstop, width=fwidth, fs=fs)
     result = notch(pro, chunksize, axis, dephase=False)
     result = resampling.downsample(result, M, fs, chunksize, axis)
-    
+ 
     # in-memory compute & write, FIXME allow writers to write pros
     x = result.to_array()
+    print(f'downsampled shape = {x.shape}')
 
     # update headers samples_per_record & num_records fields
     header = reader.header.filter(channels)
+    print(header)
     header['samples_per_record'] = [spr // M 
-            for spr in reader.header['samples_per_record']]
+            for spr in header['samples_per_record']]
     header['num_records'] = int(x.shape[axis] / (fs / M))
+
+    # change the file type to EDF since we are not writing annotations
+    header['reserved_0'] = ''
+    header['names'] = ['EEG1', 'EEG2', 'EMG']
+    header['transducers'] = ['', '', '']
+    header['prefiltering'] = ['', '', '']
+    header['digital_min'] = [int(m) for m in header['digital_min']]
+    header['digital_max'] = [int(m) for m in header['digital_max']]
+
+    print(header)
 
     # write the file
     fname = epath.stem + '_preprocessed' + epath.suffix
     filepath = Path(savedir).joinpath(fname)
     with edf.Writer(filepath) as writer:
-        writer.write(header, x, channels=channels, verbose=False)
+        writer.write(header, x, channels=np.arange(len(channels)), verbose=False)
 
     if verbose:
         elapsed = time.perf_counter() - t0
@@ -164,18 +176,18 @@ if __name__ == '__main__':
 
     basepath = '/media/matt/Zeus/jasmine/test/'
     
-    """
     name = 'CW0DI3_P097_KO_93_31_3dayEEG_2020-05-07_09_54_14.edf'
-    epath = Path(basepath).joinpath(name)
+    path = Path(basepath).joinpath(name)
 
-    x = preprocess(epath, savedir='/media/matt/Zeus/sandy/test/', verbose=True)
+    x = preprocess(path, savedir='/media/matt/Zeus/sandy/test/', verbose=True)
 
+    """
     savepath = '/media/matt/Zeus/sandy/test/' + '_processed' + '.edf'
     reader = edf.Reader(savepath)
     y = reader.read(start=0)
 
     print(np.allclose(x, y, atol=0.5))
-    """
 
     savedir = '/media/matt/Zeus/sandy/test/'
     batch(basepath, savedir)
+    """
