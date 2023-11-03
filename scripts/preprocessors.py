@@ -1,7 +1,15 @@
-"""This script preprocesses EDF files prior to estimation of the PSD. 
+"""This script contains a collection of preprocessors of EDF data including:
 
-The Xue lab data was acquired at 5 kHz and contains neural and muscular data
-channels....This module takes care of ...
+    standard:
+        A preprocessor for notch filtering, downsampling and trimming EDF files.
+    spindlize:
+        A preprocessor for performing channel selection for upload to SPINDLE
+        software site.
+    batch:
+        A function that concurrently runs a preprocessor on all the EDF files in
+        a supplied directory.
+
+Each preprocessor write a new EDF file.
 """
 
 import pickle
@@ -10,6 +18,7 @@ import warnings
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
+from typing import Sequence, Union
 
 import numpy as np
 
@@ -18,8 +27,24 @@ from openseize.file_io import edf
 from openseize.filtering import iir
 from openseize.resampling import resampling
 
-from spectraprints.core import concurrency
-from spectraprints.masking import masks
+from ebb.core import concurrency
+from ebb.masking import masks
+
+def standard(path: Union[str, Path],
+    savedir: path: Union[str, Path],
+    fs: float,
+    downsample: int,
+    notch_width: float,
+    trim_to: Sequence = [48, 72],
+    chunksize=30e5,
+    axis=-1,
+    verbose=True,
+) -> None:
+    """A standard preprocessor that notch filters, downsamples and trims data.
+
+    Args:
+        
+    """
 
 
 def preprocess(path, savedir, channels=[0, 1, 3], fs=5000, M=25, fstop=60,
