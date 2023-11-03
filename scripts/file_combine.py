@@ -4,6 +4,7 @@ experimenters joining the shorter files into a single edf.
 
 import copy
 import re
+import reprlib
 from operator import attrgetter
 from pathlib import Path
 from typing import Pattern, Sequence, Union
@@ -55,17 +56,18 @@ def pair(paths: Sequence, pattern=r'[^_]+') -> Sequence:
     """
 
     result = []
-    while paths:
+    cpaths = copy.copy(paths)
+    while cpaths:
         # remove first path and get str token with matching pattern
-        path = paths.pop(0)
+        path = cpaths.pop(0)
         token = re.search(pattern, path.stem).group()
-        matches = [other for other in paths if token in other.stem]
+        matches = [other for other in cpaths if token in other.stem]
 
         if not matches:
             msg = f'No match find for token {token}'
             raise ValueError(msg)
 
-        [paths.remove(m) for m in matches]
+        [cpaths.remove(m) for m in matches]
         result.append((path, *matches))
 
     return result
@@ -102,6 +104,7 @@ def combine_edf(
     amount: float = 24,
     nominal: float = 72,
     pattern: Pattern[str] = r'[^_]+',
+    verbose: bool = True,
 ) -> None:
     """Combines EDF files whose number of samples is less than nominal hours.
 
@@ -120,6 +123,8 @@ def combine_edf(
         pattern:
             A regex pattern string used to match files. Please see the re module
             for details.
+        verbose:
+            Boolean indicating if progress should be printed to stdout.
 
     Returns:
         None
@@ -135,26 +140,32 @@ def combine_edf(
     short_files = locate(dirpath, fs, nominal)
     path_tuples = pair(short_files, pattern)
 
+    aRepr = reprlib.Repr()
     samples = amount * fs * 3600
     for tup in path_tuples:
         # make a reader instance for each file to join
         readers = [edf.Reader(fp) for fp in tup]
         readers = sorted(readers, key=attrgetter('header.start_date'))
 
+        if verbose:
+            msg = aRepr.repr([reader.path.stem for reader in readers])
+            print('Combining: \n' + msg)
+
         # make a read to a pre-allocated arr for each reader in readers
         arr = np.zeros((*readers[0].shape[:-1], samples * len(readers)))
         for idx, reader in enumerate(readers):
             start, stop = idx * samples, (idx + 1) * samples
-            arr[..., start:stop] = reader.read(samples)
+            arr[..., start:stop] = reader.read(0, samples)
+            reader.close()
 
         # create a header and increase the num_records to match combined size
         header = copy.deepcopy(readers[0].header)
-        header['num_records'] = arr.shape[-1] / header.samples_per_record[0]
+        header['num_records'] = arr.shape[-1] // header.samples_per_record[0]
 
         # make a new path for the combined file
         fp = reader.path.with_stem(readers[0].path.stem + '_COMBINED')
         with edf.Writer(fp) as writer:
-            writer.write(header, arr, channels=reader.channels)
+            writer.write(header, arr, reader.channels, verbose=verbose)
 
     #  move each short file to a short files subdirectory
     move_files(dirpath.joinpath('short_files'), short_files)
@@ -169,8 +180,13 @@ if __name__ == '__main__':
     validate_length(reader, 72, fs=5000)
     """
 
+    """
     paths = list(
         Path('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/short_files/').iterdir()
     )
 
     result = pair(paths)
+    """
+
+    dirpath = Path('/media/matt/DataD/Xue/EbbData/6_week_post')
+    combine_edf(dirpath, fs=5000)
