@@ -172,8 +172,7 @@ def spindle(
     reader.close()
 
 
-# FIXME REFACTOR
-def batch(preprocessor, dirpath, savedir, ncores=None, verbose=True, **kwargs):
+def batch(preprocessor, dirpath, ncores=None, verbose=True, **kwargs):
     """Preprocesses all EDF files in dir path saving the preprocessed data to
     savedir.
 
@@ -182,8 +181,6 @@ def batch(preprocessor, dirpath, savedir, ncores=None, verbose=True, **kwargs):
             A callable that preprocesses a single EDF file.
         dirpath:
             A directory containing EDF files to preprocess.
-        savedir:
-            A directory to where preprocessed data will be save in EDF format.
         ncores:
             The number of processing cores to concurrently preprocess EDF files
             in dirpath.
@@ -194,21 +191,25 @@ def batch(preprocessor, dirpath, savedir, ncores=None, verbose=True, **kwargs):
         None
     """
 
-    epaths = list(Path(dirpath).glob('*edf'))
+    target = Path(dirpath).joinpath(preprocessor.__name__)
+    target.mkdir()
 
-    t0 = time.perf_counter()
+    # get all the edfs and set the number of cpu workers
+    paths = list(Path(dirpath).glob('*edf'))
+    workers = concurrency.set_cores(ncores, len(paths))
     if verbose:
-        msg = (f'Executing Batch Preprocessor for {len(epaths)} files'
-               f' in {dirpath}')
+        msg = (f"Executing Batched Preprocessor '{preprocessor.__name__}' on "
+               f'{len(paths)} files using {workers} cores.')
         print(msg)
 
-    func = partial(preprocessor, savedir=savedir, **kwargs)
-    workers = concurrency.set_cores(ncores, len(epaths))
+    # Execute and time this batch preprocess
+    t0 = time.perf_counter()
+    func = partial(preprocessor, savedir=target, **kwargs)
     with Pool(workers) as pool:
-        pool.map(func, epaths)
+        pool.map(func, paths)
 
     elapsed = time.perf_counter() - t0
-    msg = f'Saved {len(epaths)} files to {savedir} in {elapsed} s'
+    msg = f'Saved {len(paths)} files to {savedir} in {elapsed} s'
     print(msg)
 
 
@@ -217,10 +218,12 @@ if __name__ == '__main__':
 
     import time
     basepath = '/media/matt/Zeus/sandy/test/'
-    
+
+    """
     name = ('CW0DA1_P096_KO_15_53_3dayEEG'
             '_2020-04-13_08_58_30_preprocessed.edf')
     path = Path(basepath).joinpath(name)
+    """
 
     """
     t0 = time.perf_counter()
@@ -229,5 +232,6 @@ if __name__ == '__main__':
     print(f'Elapsed {time.perf_counter() - t0} s')
     """
 
-    spindle(path, savedir='/media/matt/Zeus/sandy/test/', channels=[0,1,3])
+    #spindle(path, savedir='/media/matt/Zeus/sandy/test/', channels=[0,1,3])
 
+    batch(standard, basepath, fs=5000, downsample=25)
