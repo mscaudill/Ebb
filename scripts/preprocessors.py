@@ -217,6 +217,7 @@ def batch(preprocessor, dirpath, ncores=None, verbose=True, **kwargs):
 
 if __name__ == '__main__':
 
+    # a super important change here
     import time
     basepath = '/media/matt/Zeus/sandy/test/'
 
