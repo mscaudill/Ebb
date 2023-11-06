@@ -93,7 +93,7 @@ def standard(
     idx = np.searchsorted(trim_samples, reader.shape[axis], side='right') - 1
     if idx < 0:
         hrs = reader.shape[axis] / (3600 * fs)
-        msg = f'{epath.stem} is {hrs} hrs, a value below all trim_to {trim_to}'
+        msg = f'{path.stem} is {hrs} hrs, a value below all trim_to {trim_to}'
         raise ValueError(msg)
     stop = trim_samples[idx]
     # ensure stop is integer multiple of samples per record / downsample
@@ -204,6 +204,7 @@ def batch(preprocessor, dirpath, ncores=None, verbose=True, **kwargs):
 
     # Execute and time this batch preprocess
     t0 = time.perf_counter()
+    kwargs.pop('savedir', None)
     func = partial(preprocessor, savedir=target, **kwargs)
     with Pool(workers) as pool:
         pool.map(func, paths)
