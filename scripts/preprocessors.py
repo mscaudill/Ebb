@@ -224,12 +224,29 @@ def batch(preprocessor, dirpath, target=None, ncores=None, verbose=True, **kwarg
 if __name__ == '__main__':
 
     #Compute standard preprocessed edfs
-    """
-    basepath = '/media/matt/DataD/Xue/EbbData/6_week_post/'
+    
+    basepath = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3'
     batch(standard, basepath, fs=5000, downsample=25)
+  
+    """
+    missing = {'CW0DC2', 'CWODC3', 'CW0DC4', 'CW3693', 'CW3696'}
+    all_paths = list(Path(basepath).glob('*.edf'))
+    missing_paths = [p for p in all_paths if p.stem[:6] in missing]
+    for path in missing_paths:
+        print(f'Preprocessing {path.name}')
+        standard(path,
+                 savedir=Path(basepath).joinpath('standard'),
+                 fs=5000,
+                 downsample=25)
+
+        print(f'File {path.stem} saved!')
     """
 
+
+    
+    """
     # Compute spindle edfs from standard processed edfs
-    standard_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/standard/'
-    target = '/media/matt/DataD/Xue/EbbData/6_week_post/spindle/'
+    standard_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/standard/'
+    target = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/spindle/'
     batch(spindle, standard_dir, target=target, channels=[0, 1, 3])
+    """
