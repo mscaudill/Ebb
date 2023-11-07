@@ -6,6 +6,7 @@ dependencies:
   - matplotlib
   - ipython
   - notebook
+  - jedi = 0.17.2
   # testing
   - pytest
   - pytest-cov

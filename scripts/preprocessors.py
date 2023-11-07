@@ -172,7 +172,7 @@ def spindle(
     reader.close()
 
 
-def batch(preprocessor, dirpath, ncores=None, verbose=True, **kwargs):
+def batch(preprocessor, dirpath, target=None, ncores=None, verbose=True, **kwargs):
     """Preprocesses all EDF files in dir path saving the preprocessed data to
     savedir.
 
@@ -181,6 +181,10 @@ def batch(preprocessor, dirpath, ncores=None, verbose=True, **kwargs):
             A callable that preprocesses a single EDF file.
         dirpath:
             A directory containing EDF files to preprocess.
+        target:
+            A directory where preprocessed files will be saved to. If None,
+            a new subdirectory is created in dirpath with the name of the
+            preprocessor.
         ncores:
             The number of processing cores to concurrently preprocess EDF files
             in dirpath.
@@ -191,7 +195,9 @@ def batch(preprocessor, dirpath, ncores=None, verbose=True, **kwargs):
         None
     """
 
-    target = Path(dirpath).joinpath(preprocessor.__name__)
+    if not target:
+        target = Path(dirpath).joinpath(preprocessor.__name__)
+    target = Path(target) 
     target.mkdir()
 
     # get all the edfs and set the number of cpu workers
@@ -210,30 +216,20 @@ def batch(preprocessor, dirpath, ncores=None, verbose=True, **kwargs):
         pool.map(func, paths)
 
     elapsed = time.perf_counter() - t0
-    msg = f'Saved {len(paths)} files to {savedir} in {elapsed} s'
+    msg = f'Saved {len(paths)} files to {target} in {elapsed} s'
     print(msg)
 
 
 
 if __name__ == '__main__':
 
-    # a super important change here
-    import time
-    basepath = '/media/matt/Zeus/sandy/test/'
-
+    #Compute standard preprocessed edfs
     """
-    name = ('CW0DA1_P096_KO_15_53_3dayEEG'
-            '_2020-04-13_08_58_30_preprocessed.edf')
-    path = Path(basepath).joinpath(name)
-    """
-
-    """
-    t0 = time.perf_counter()
-    standard(path, savedir='/media/matt/Zeus/sandy/test/', fs=5000,
-            downsample=25)
-    print(f'Elapsed {time.perf_counter() - t0} s')
-    """
-
-    #spindle(path, savedir='/media/matt/Zeus/sandy/test/', channels=[0,1,3])
-
+    basepath = '/media/matt/DataD/Xue/EbbData/6_week_post/'
     batch(standard, basepath, fs=5000, downsample=25)
+    """
+
+    # Compute spindle edfs from standard processed edfs
+    standard_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/standard/'
+    target = '/media/matt/DataD/Xue/EbbData/6_week_post/spindle/'
+    batch(spindle, standard_dir, target=target, channels=[0, 1, 3])
