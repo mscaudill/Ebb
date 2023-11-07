@@ -25,7 +25,7 @@ import numpy as np
 import numpy.typing as npt
 from openseize.core.producer import producer, Producer
 from openseize.file_io import annotations
-from spectraprints.core import arraytools
+from ebb.core import arraytools
 
 
 def threshold(pro: Producer,
