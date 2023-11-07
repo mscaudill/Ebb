@@ -218,7 +218,7 @@ def batch(preprocessor, dirpath, ncores=None, verbose=True, **kwargs):
 if __name__ == '__main__':
 
     import time
-    basepath = '/media/matt/Zeus/sandy/test/'
+    basepath = '/media/matt/DataD/Xue/EbbData/6_week_post/'
 
     """
     name = ('CW0DA1_P096_KO_15_53_3dayEEG'

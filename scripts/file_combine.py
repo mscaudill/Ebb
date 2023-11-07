@@ -172,21 +172,6 @@ def combine_edf(
 
 
 if __name__ == '__main__':
-    """
-    path = ('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/'
-       'CW0DA1_P096_KO_15_53_3dayEEG_2020-04-13_08_58_30.edf')
-
-    reader = edf.Reader(path)
-    validate_length(reader, 72, fs=5000)
-    """
-
-    """
-    paths = list(
-        Path('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/short_files/').iterdir()
-    )
-
-    result = pair(paths)
-    """
 
     dirpath = Path('/media/matt/DataD/Xue/EbbData/6_week_post')
     combine_edf(dirpath, fs=5000)
