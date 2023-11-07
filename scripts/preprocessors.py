@@ -210,7 +210,7 @@ def batch(preprocessor, dirpath, ncores=None, verbose=True, **kwargs):
         pool.map(func, paths)
 
     elapsed = time.perf_counter() - t0
-    msg = f'Saved {len(paths)} files to {savedir} in {elapsed} s'
+    msg = f'Saved {len(paths)} files to {target} in {elapsed} s'
     print(msg)
 
 
