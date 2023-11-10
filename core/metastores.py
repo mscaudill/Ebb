@@ -239,6 +239,7 @@ class MetaMask(mixins.ViewInstance):
         self,
         r: int = 2,
         logical: Callable[..., npt.NDArray] = np.logical_and,
+        contains: Optional[str] = None,
     ) -> Iterator[Tuple[Tuple[str, ...], npt.NDArray[np.bool_]]]:
         """Yields unique r-lenghted combinations of the masks in this MetaMask.
 
@@ -266,6 +267,7 @@ class MetaMask(mixins.ViewInstance):
 
         for names in itertools.combinations(self.names, r=r):
             yield self(*names, logical=logical)
+
 
     def __call__(
         self,
