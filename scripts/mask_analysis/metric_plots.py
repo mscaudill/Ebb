@@ -7,8 +7,8 @@ import numpy as np
 from spectraprints.scripts.plotting import boxplot_dict
 
 # Set the file location and load
-FILENAME = 'ube3a_mask_performances_avg10mins_2.pkl'
-BASEPATH = '/media/matt/Zeus/sandy/results/'
+FILENAME = 'ube3a_mask_performances_avg3mins_radius0pt5secs.pkl'
+BASEPATH = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/mask_parameter_testing/'
 
 fp = Path(BASEPATH).joinpath(FILENAME)
 with open(fp, 'rb') as infile:
@@ -40,7 +40,7 @@ axarr[-1,-2].legend(performances['accuracy'].keys(), labelcolor=colors,
 axarr[-1,-1].axis('off')
 
 # manage plt properties
-plt.suptitle(f'UBE3A Thresholding Window of 10 mins with Merge Radius = 0.5 secs'
+plt.suptitle(f'UBE3A Thresholding Window of 3 mins with Merge Radius = 0.5 secs'
              f'\n n = {len(animals)} animals')
 plt.subplots_adjust(wspace=.4, hspace=.2)
 plt.show()

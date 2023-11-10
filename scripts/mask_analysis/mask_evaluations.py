@@ -134,8 +134,9 @@ def make_metamask(epath, apath, spath, verbose=False):
     NSTDS = [3, 4, 5, 6]
     #WINSIZE = 1.5E4 # @ FS = 250 THIS IS 60 SECS OF DATA
     #WINSIZE = 1.5E5 # @ FS = 250 THIS IS 600 SECS OF DATA
-    WINSIZE = 3.6e4 # @FS = 200 THIS IS 180 SECS
-    RADIUS = 100 # THIS IS IN SAMPLES
+    #WINSIZE = 3.6E4 # @FS = 200 THIS IS 180 SECS
+    WINSIZE = 1.2E5 #@FS = 200 this is 600 secs of data 
+    RADIUS = 100 # THIS 1/2 sec at FS=200
 
     # annotation Args
     # TODO - need more flexibility in artifact mask like regex
@@ -315,7 +316,7 @@ if __name__ == '__main__':
         pickle.dump(metamask, outfile)
     """
   
-    dirpath = Path('/media/matt/Zeus/jasmine/ube3a/')
+    dirpath = Path('/media/matt/Zeus/jasmine/stxbp1')
     performances = evaluate(dirpath,
         savepath=('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/mask_parameter_testing/'
-                  'ube3a_mask_performances_avg3mins_radius0pt5secs.pkl'))
+                  'stxbp1_mask_performances_avg10mins_radius0pt5secs.pkl'))
