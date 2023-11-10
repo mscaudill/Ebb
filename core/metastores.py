@@ -8,20 +8,21 @@ Classes:
         numpy array operations.
     MetaMask:
         A callable that names and stores 1D boolean mask. On call, it can
-        combine any combination of these stored masks using an callable
+        combine any combination of these stored masks using any callable
         implementing element-wise logic rules.
 """
 
 import copy
 import functools
+import itertools
 import warnings
+from collections import abc
 from numbers import Number
-from typing import Dict, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Iterator, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
-from spectraprints.core import mixins
-
+from ebb.core import mixins
 
 # Type definitions
 Coords = Dict[str, Union[Sequence, range]]
@@ -34,14 +35,14 @@ class MetaArray(mixins.ViewInstance):
     MetaArrays offer simple storage and data selection by labels as opposed to
     numpy numerical indexing. They are not a valid type for numerical processing
     with numpy. More sophisticated software such as pandas or xarray support
-    numerical operations. 
+    numerical operations.
 
     Attrs:
         data:
             An N-dimensional numpy array to represent.
         coords:
             A dictionary of axis string name keys and index label values.
-            
+
     Examples:
         >>> data = np.random.random((3, 4, 6))
         >>> trials = [f'trial_{idx}' for idx in range(data.shape[0])]
@@ -104,7 +105,7 @@ class MetaArray(mixins.ViewInstance):
 
         Raises:
             A ValueError is issued if the dimensionality or shape of the
-            coordinates does not match data's dims. or shape 
+            coordinates does not match data's dims. or shape
         """
 
         default = {f'axis{ix}': range(s) for ix, s in enumerate(self.shape)}
@@ -167,7 +168,7 @@ class MetaArray(mixins.ViewInstance):
     ) -> 'MetaArray':
         """Returns a new MetaArray by slicing this MetaArray with axis names &
         labels in selections.
-        
+
         Args:
             **selections:
                 Keyword arguments specifying an axis name and labels to slice
@@ -201,23 +202,23 @@ class MetaArray(mixins.ViewInstance):
         return instance
 
 
-# pylint: disable-next=too-few-public-methods
 class MetaMask(mixins.ViewInstance):
-    """A callable that stores & returns element-wise combinations of 1-D
-    boolean masks.
-    
+    """A callable container that stores & returns element-wise combinations
+    of boolean masks.
+
     Examples:
         >>> m = MetaMask(x=[1, 0, 0, 1], y=[0, 1, 0, 1])
         >>> m('x', 'y', logical=np.logical_and)
-        ('x + y', array([False, False, False,  True]))
+        (('x', 'y'), array([False, False, False,  True]))
     """
 
-    def __init__(self,
-                 metadata: Optional[Dict] = None,
-                 **named_masks,
+    def __init__(
+        self,
+        metadata: Optional[Dict] = None,
+        **named_masks,
     ) -> None:
         """Initialize this MetaMask with metadata and named mask to store.
-        
+
         Args:
             metadata:
                 Any desired metadata to associate with the named masks.
@@ -234,16 +235,51 @@ class MetaMask(mixins.ViewInstance):
 
         return [name for name in self.__dict__ if name != 'metadata']
 
-    def __call__(self, *names, logical=np.logical_and,
-    ) -> Tuple[str, npt.NDArray[np.bool_]]:
-        """Returns the element-wise logical combination of all mask with name in
-        names.
+    def combinations(
+        self,
+        r: int = 2,
+        logical: Callable[..., npt.NDArray] = np.logical_and,
+    ) -> Iterator[Tuple[Tuple[str, ...], npt.NDArray[np.bool_]]]:
+        """Yields unique r-lenghted combinations of the masks in this MetaMask.
+
+        Args:
+            r:
+                The number of mask included in each combination.
+            logical:
+                A function used to combine the r-masks in each combination. This
+                function must accept any number of lengthed 1-D booleans.
+
+        Yields:
+            names, combined array tuples of length r.
+
+        Examples:
+            >>> x = [1,0,0,1]
+            >>> y = [0,1,1,1]
+            >>> z = [0,0,1,1]
+            >>> metamask = MetaMask(x=x, y=y, z=z)
+            >>> for tup in metamask.combinations(r=2):
+            ...     print(tup)
+            (('x', 'y'), array([False, False, False,  True]))
+            (('x', 'z'), array([False, False, False,  True]))
+            (('y', 'z'), array([False, False,  True,  True]))
+        """
+
+        for names in itertools.combinations(self.names, r=r):
+            yield self(*names, logical=logical)
+
+    def __call__(
+        self,
+        *names,
+        logical=np.logical_and,
+        **kwargs,
+    ) -> Tuple[Tuple[str,...], npt.NDArray[np.bool_]]:
+        """Returns the element-wise logical combination of named masks.
 
         Args:
             names:
                 The string name(s) of mask to logically combine.
             logical:
-                A callable that accepts and combines two 1-D boolean masks.
+                A callable that accepts and combines 1-D boolean masks.
 
         Returns:
             A tuple containing a combined string name and a 1-D boolean array,
@@ -262,5 +298,17 @@ class MetaMask(mixins.ViewInstance):
 
             submasks = [mask[:min_length] for mask in submasks]
 
-        name = ' + '.join(names)
-        return name, functools.reduce(logical, submasks)
+        return names, functools.reduce(logical, submasks)
+
+    def __contains__(self, name: str) -> bool:
+        """Test membership of named mask in this MetaMask.
+
+        Args:
+            name:
+                Name of mask to search this MetaMask for.
+
+        Returns:
+            True if this Metamask contains a mask with name else False.
+        """
+
+        return name in self.names
