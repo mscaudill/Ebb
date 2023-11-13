@@ -104,6 +104,8 @@ def standard(
     # Notch filter and downsample the producer
     notch = iir.Notch(60, width=notch_width, fs=fs)
     result = notch(pro, chunksize, axis, dephase=False)
+
+    # FIXME  FILE CW0DC2 fails to resample!!!
     result = resampling.downsample(result, downsample, fs, chunksize, axis)
     # FIXME openseize 1.3.0 to support write from producer
     processed = result.to_array()

@@ -1,169 +1,114 @@
-import itertools
-import pickle
-import time
-from multiprocessing import Pool
-from pathlib import Path
+"""A script for computing and storing EEG Metrics and/or Biomarkers.
 
+"""
+
+from pathlib import Path
+from typing import Dict, List, Tuple, Union
+
+import numpy.typing as npt
+from ebb.core import metastores
+from ebb.masking import masks
+from openseize.file_io import edf
 from openseize import producer
-from openseize.file_io import edf, path_utils
-from openseize.filtering import iir
-from openseize.resampling import resampling
 from openseize.spectra import estimators
 
-from spectraprints.masking import masks
-from spectraprints.core import concurrency
-from spectraprints.core.metastores import MetaArray, MetaMask
 
-# GLOBALS
-# Production and preprocessing Args
-CHS = [0, 1, 2]
-FS = 5000       
-M = 20
-DFS = FS // M
-CSIZE = 30E5
-AXIS = -1
-# TODO Cap stop value in preprocess at 48 or 72 hrs depend on data recording
-START, STOP = None, None
-
-# Thresholding Args
-NSTDS = [5]
-WINSIZE = 1.5E4 # @ FS = 250 THIS IS 60 SECS OF DATA
-RADIUS = 125 # IN SAMPLES
-
-# State Args
-STATE_LABELS = [['w'], ['r', 'n']]
-STATE_WINSIZE = 4 # Spindle window size
-
-
-def preprocess(epath, channels, fs, M, start, stop, chunksize, axis):
-    """Preprocesses an EEG file at path by constructing, notch filtering and
-    downsampling a producer.
+def estimate(
+    path: Union[str, Path],
+    state_path: Union[str, Path],
+    channels: List = [0,1,2],
+    fs: float = 200,
+    chunksize: int = 30e5,
+    labels: Dict = {'wake': ['w'], 'sleep': ['n', 'r']},
+    winsize: float = 180,
+    nstds: float = 5,
+    radius: float = 0.5,
+    verbose: bool = True,
+    **kwargs,
+) -> Dict[str, Tuple[int, npt.NDArray, npt.NDArray]]:
+    """Estimates the Power spectral density of EEG data stored to an EDF at path
+    for each state in a states path CSV file.
 
     Args:
-        epath:
-            Path to an edf file.
+        path:
+            Path to an EDF file whose PSD will be estimated.
+        state_path:
+            Path to a Spindle generated CSV file of states. Please note the
+            allowable states are 'w'-wake, 'r'-rem and 'n'-non-rem only. This
+            means the artifact slider in the Spindle web service must be set to
+            0. If state_path is None, the PSDs ar
         channels:
-            The channels to include in the processed producer.
+            The channels for which PSDs will be estimated.
         fs:
-            The sampling rate at which the data at path was collected.
-        M:
-            The downsample factor to reduce the number of samples produced by
-            the returned processed producer.
-        start:
-            The start index at which production begins. If None start is 0.
-        stop:
-            The stop index at which production stops. If None stop is data
-            length along axis.
-        chunksize:
-            The number of processed samples along axis to yield from the 
-            producer at a time.
-        axis:
-            The axis of reading and production.
+            The sampling rate of the data in the EDF.
+        labels:
+            A dict of label names and spindle codes one per state for which PSDs
+            will be computed.
+        winsize:
+            The size of the window for threshold artifact detection using the
+            threshold mask. This value has units of seconds. Please see
+            ebb.masking.threshold
+        nstds:
+            The number of standard deviations a deflection must cross to be
+            considered an artifact. Please see ebb.masking.threshold
+        radius:
+            The number of secs below which two detected artifacts will be merged
+            into a single artifact. Please see ebb.masking.threshold.
+        verbose:
+            Boolean indicating if information about which PSD is currently being
+            computed should print to stdout.
+        **kwargs:
+            All kwargs are passed to openseize's psd estimator function.
 
     Returns:
-        A producer of preprocessed values.
+        A list of Tuples one per state in labels and each containing (count,
+        freqs, psd) where count is the number of estimatives (i.e. averaged
+        windows); freqs are the frequencies at which the PSD is estimated; psd
+        are the psd values array with shape chs x freqs.
     """
 
-    reader = edf.Reader(epath)
-    reader.channels = channels
+    with edf.Reader(path) as reader:
 
-    start = 0 if not start else start
-    stop = reader.shape[axis] if not stop else stop
-    if stop - start < reader.shape[axis]:
-        pro = masks.between_pro(reader, start, stop, chunksize, axis)
-    else:
-        pro = producer(reader, chunksize, axis)
+        # build a producer
+        reader.channels = channels
+        pro = producer(reader, chunksize=chunksize, axis=-1)
 
-    # Notch filter the producer
-    notch = iir.Notch(fstop=60, width=6, fs=fs)
-    result = notch(pro, chunksize, axis, dephase=False)
+        # build state masks
+        named_masks = {}
+        for label, code in labels.items():
+            named_masks[label] = masks.state(state_path, code, fs, winsize=4)
 
-    # downsample the producer
-    result = resampling.downsample(result, M, fs, chunksize, axis)
+        # build artifact threshold mask and metamask to hold all masks
+        wsize, rad = int(winsize * fs), int(radius * fs)
+        threshold = masks.threshold(pro, [nstds], wsize, rad)[0]
+        metamask = metastores.MetaMask(threshold=threshold, **named_masks)
+
+        print(metamask)
+
+        # compute psd estimates for each mask combination
+        result = {}
+        for name, mask in metamask.combinations():
+            if 'threshold' in name:
+                if verbose:
+                    print(f'Computing PSD for state: {name}', end='\r')
+                maskedpro = producer(pro, chunksize=chunksize, axis=-1, mask=mask)
+                result[name] = estimators.psd(maskedpro, fs=fs, **kwargs)
+                # clear stdout line likely POSIX specific
+                print(end='\x1b[2K')
+
     return result
 
-
-def make_metamask(epath, spath, verbose=False):
-    """Returns a MetaMask instance containing thresholded masks, annotations
-    mask, and Spindle sleep score masks.
-
-    The specific parameters used to make the thresholded and spindle mask can be
-    found in the GLOBALS section at the top of this script.
-    """
-
-    t0 = time.perf_counter()
-   
-    # preprocess a producer for between START and STOP
-    pro = preprocess(epath, channels=CHS, fs=FS, M=M, start=START, stop=STOP,
-                     chunksize=CSIZE, axis=AXIS)
-
-    # build threshold masks
-    thresholded = masks.threshold(pro, nstds=NSTDS, winsize=WINSIZE, 
-                                  radius=RADIUS)
-    thresholded_names = [f'threshold={std}' for std in NSTDS]
-    thresholded = dict(zip(thresholded_names, thresholded))
-    
-    # build state masks
-    stated = [masks.state(spath, ls, DFS, STATE_WINSIZE) for ls in STATE_LABELS]
-    state_names = ['awake', 'sleep']
-    stated = dict(zip(state_names, stated))
-
-    if verbose:
-        name = Path(epath).stem
-        print(f' Completed building MetaMask for {name}'
-               ' in {time.perf_counter() - t0} s')
-
-    return MetaMask(**thresholded, **stated)
-
-
-def process_file(epath, spath, verbose=False):
-    """ """
-
-    # there is some real ineffeciency here because we preprocess to get
-    # threshold masks and then preprocess again to get psd estimates. Look to
-    # see if this is avoidable
-    #
-    # We won't be able to really see how long this function takes until we have
-    # the full spindle for 72 hours
-
-    t0 = time.perf_counter()
-
-    metamask = make_metamask(epath, spath)
-    
-
-    mask_names = metamask.names
-    threshold_names = [name for name in mask_names if 'threshold' in name]
-    state_names = [name for name in mask_names if name in ['awake', 'sleep']]
-    
-    result = {}
-    for state, threshold in itertools.product(state_names, threshold_names):
-        
-        # build the combined mask
-        combo_name, mask = metamask(state, threshold)
-
-        # preprocess the producer and mask it
-        pro = preprocess(epath, CHS, FS, M, START, STOP, CSIZE, AXIS)
-        maskpro = producer(pro, CSIZE, AXIS, mask=mask)
-
-        # Estimate the PSD
-        cnt, freqs, psd = estimators.psd(maskpro, fs=DFS)
-        result[combo_name] = (cnt, freqs, psd)
-
-    print(f'PSDs for {epath.stem} computed in {time.perf_counter()-t0} secs.')
-
-    # FIXME what is a unique name where animals recorded from and then treated?
-    return Path(epath).stem, result
-
+# TODO -- Almost ready to batch except we need to get storage using MetaArray
+# worked out next
 
 if __name__ == '__main__':
 
-    basepath = Path('/media/matt/Zeus/jasmine/stxbp1')
+    fp = ('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/standard/'
+          'CW0DA1_P096_KO_15_53_3dayEEG_2020-04-13_08_58_30_PREPROCESSED.edf')
 
-    efile = 'CW0DI2_P097_KO_92_30_3dayEEG_2020-05-07_09_54_11.edf'
-    sfile = 'CW0DI2_P097_KO_92_30_3dayEEG_2020-05-07_09_54_11_sleep_states.csv'
-    epath = basepath.joinpath(efile)
-    spath = basepath.joinpath(sfile)
+    state_path = ('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/spindle/'
+                  'CW0DA1_P096_KO_15_53_3dayEEG_2020' + \
+                  '-04-13_08_58_30_PREPROCESSED_SPINDLE_labels.csv')
 
-    result = process_file(epath, spath)
-
+    results = estimate(fp, state_path, verbose=True)
 
