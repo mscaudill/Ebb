@@ -83,6 +83,8 @@ def estimate(
         threshold = masks.threshold(pro, [nstds], wsize, rad)[0]
         metamask = metastores.MetaMask(threshold=threshold, **named_masks)
 
+        print(metamask)
+
         # compute psd estimates for each mask combination
         result = {}
         for name, mask in metamask.combinations():
@@ -108,5 +110,5 @@ if __name__ == '__main__':
                   'CW0DA1_P096_KO_15_53_3dayEEG_2020' + \
                   '-04-13_08_58_30_PREPROCESSED_SPINDLE_labels.csv')
 
-    results = estimate(fp, state_path, verbose=False)
+    results = estimate(fp, state_path, verbose=True)
 
