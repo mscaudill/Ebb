@@ -225,11 +225,11 @@ if __name__ == '__main__':
 
     #Compute standard preprocessed edfs
     
-    basepath = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3'
-    batch(standard, basepath, fs=5000, downsample=25)
+    #basepath = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3'
+    #batch(standard, basepath, fs=5000, downsample=25)
   
     """
-    missing = {'CW0DC2', 'CWODC3', 'CW0DC4', 'CW3693', 'CW3696'}
+    missing = {'CW3693'}
     all_paths = list(Path(basepath).glob('*.edf'))
     missing_paths = [p for p in all_paths if p.stem[:6] in missing]
     for path in missing_paths:
@@ -244,9 +244,22 @@ if __name__ == '__main__':
 
 
     
-    """
-    # Compute spindle edfs from standard processed edfs
-    standard_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/standard/'
-    target = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/spindle/'
-    batch(spindle, standard_dir, target=target, channels=[0, 1, 3])
-    """
+    
+    #Compute spindle edfs from standard processed edfs
+    basepath = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3'
+    stdpath = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/standard'
+    missing = {'CW3693'}
+    all_paths = list(Path(stdpath).glob('*.edf'))
+    missing_paths = [p for p in all_paths if p.stem[:6] in missing]
+    for path in missing_paths:
+        print(f'Preprocessing {path.name}')
+        spindle(path,
+                savedir=Path(basepath).joinpath('spindle'), 
+                channels = [0,1,3])
+                 
+
+        print(f'File {path.stem} saved!')
+    #standard_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/standard/'
+    #target = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/spindle/'
+    #batch(spindle, standard_dir, target=target, channels=[0, 1, 3])
+    
