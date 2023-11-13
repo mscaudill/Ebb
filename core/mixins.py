@@ -64,8 +64,9 @@ class ViewInstance:
         props = self._fetch_properties()
         attrs.update(props)
         #make strings of name, value pairs for each attr
-        attr_strs = [name + ': ' + reprlib.repr(val) for 
-                     name, val in attrs.items()]
+        #attr_strs = [name + ': ' + reprlib.repr(val) for 
+        #             name, val in attrs.items()]
+        attr_strs = [name + ': ' + str(val) for name, val in attrs.items()]
         #make a help msg
         help_msg = 'Type help({}) for full documentation'.format(cls_name)
         #construct print string
