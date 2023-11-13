@@ -2,12 +2,16 @@
 
 """
 
+import time
+from functools import partial
+from multiprocessing import Pool
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
 import numpy.typing as npt
-from ebb.core import metastores
+from ebb.core import concurrency, metastores
 from ebb.masking import masks
+from ebb.scripts.file_combine import pair
 from openseize.file_io import edf
 from openseize import producer
 from openseize.spectra import estimators
@@ -98,11 +102,38 @@ def estimate(
 
     return result
 
-# TODO -- Almost ready to batch except we need to get storage using MetaArray
-# worked out next
+def batch(eeg_dir, state_dir, save_dir, pattern=r'[^_]+', **kwargs):
+    """ """
+
+    # remove any path arguments from kwargs
+    [kwargs.pop(x, None) for x in ('path', 'state_path')]
+
+    # pair the eeg paths with the state paths
+    eeg_paths = list(Path(eeg_dir).glob('*PROCESSED.edf'))
+    state_paths = list(Path(state_dir).glob('*.csv'))
+    paired = pair(eeg_paths + state_paths, pattern=pattern)
+
+    workers = concurrency.set_cores(ncores, len(paths))
+    if verbose:
+        msg = (f'Executing Batched PSD on {len(eeg_paths)} files using'
+               f'{workers} cores.')
+        print(msg)
+
+    # construct a partial to pass to Multiprocess pool
+    estimator = functoolss.partial(estimate, **kwargs)
+    t0 = time.perf_counter()
+    with Pool(workers) as pool:
+       results = pool.starmap(estimator, paired)
+
+    elapsed = time.perf_counter() - t0
+    print(elapsed)
+    return results
+
+
 
 if __name__ == '__main__':
 
+    """
     fp = ('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/standard/'
           'CW0DA1_P096_KO_15_53_3dayEEG_2020-04-13_08_58_30_PREPROCESSED.edf')
 
@@ -111,4 +142,9 @@ if __name__ == '__main__':
                   '-04-13_08_58_30_PREPROCESSED_SPINDLE_labels.csv')
 
     results = estimate(fp, state_path, verbose=True)
+    """
+
+    eeg_dir = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/standard/'
+    state_dir = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/spindle/states/'
+    paired = batch(eeg_dir, state_dir, None)
 
