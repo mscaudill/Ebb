@@ -2,8 +2,9 @@
 
 """
 
+import functools
 import time
-from functools import partial
+from dataclasses import dataclass
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
@@ -16,6 +17,15 @@ from openseize.file_io import edf
 from openseize import producer
 from openseize.spectra import estimators
 
+@dataclass
+class PSDItem:
+    """A class for keeping track of a PSD and all metadata."""
+
+    path: Union[str, Path]
+    state: Tuple[str,...]
+    estimatives: int
+    freqs: npt.NDArray
+    psd: npt.NDArray
 
 def estimate(
     path: Union[str, Path],
@@ -87,22 +97,22 @@ def estimate(
         threshold = masks.threshold(pro, [nstds], wsize, rad)[0]
         metamask = metastores.MetaMask(threshold=threshold, **named_masks)
 
-        print(metamask)
-
         # compute psd estimates for each mask combination
-        result = {}
-        for name, mask in metamask.combinations():
-            if 'threshold' in name:
+        result = []
+        for combo_state, mask in metamask.combinations():
+            if 'threshold' in combo_state:
                 if verbose:
-                    print(f'Computing PSD for state: {name}', end='\r')
+                    print(f'Computing PSD for state: {combo_state}', end='\r')
                 maskedpro = producer(pro, chunksize=chunksize, axis=-1, mask=mask)
-                result[name] = estimators.psd(maskedpro, fs=fs, **kwargs)
+                result_tup = estimators.psd(maskedpro, fs=fs, **kwargs)
                 # clear stdout line likely POSIX specific
                 print(end='\x1b[2K')
+                result.append(PSDItem(path.stem, combo_state, *result_tup))
 
     return result
 
-def batch(eeg_dir, state_dir, save_dir, pattern=r'[^_]+', **kwargs):
+def batch(eeg_dir, state_dir, save_dir, pattern=r'[^_]+', ncores=12,
+        verbose=True, **kwargs):
     """ """
 
     # remove any path arguments from kwargs
@@ -113,21 +123,21 @@ def batch(eeg_dir, state_dir, save_dir, pattern=r'[^_]+', **kwargs):
     state_paths = list(Path(state_dir).glob('*.csv'))
     paired = pair(eeg_paths + state_paths, pattern=pattern)
 
-    workers = concurrency.set_cores(ncores, len(paths))
+    workers = concurrency.set_cores(ncores, len(paired))
     if verbose:
         msg = (f'Executing Batched PSD on {len(eeg_paths)} files using'
-               f'{workers} cores.')
+               f' {workers} cores.')
         print(msg)
 
     # construct a partial to pass to Multiprocess pool
-    estimator = functoolss.partial(estimate, **kwargs)
+    estimator = functools.partial(estimate, verbose=False, **kwargs)
     t0 = time.perf_counter()
     with Pool(workers) as pool:
        results = pool.starmap(estimator, paired)
-
     elapsed = time.perf_counter() - t0
-    print(elapsed)
-    return results
+
+    
+
 
 
 
@@ -144,7 +154,12 @@ if __name__ == '__main__':
     results = estimate(fp, state_path, verbose=True)
     """
 
+    """
     eeg_dir = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/standard/'
     state_dir = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/spindle/states/'
-    paired = batch(eeg_dir, state_dir, None)
+    """
+
+    eeg_dir = '/media/matt/Zeus/claudia/test/standard/'
+    state_dir = '/media/matt/Zeus/claudia/test/spindle/'
+    results = batch(eeg_dir, state_dir, None)
 
