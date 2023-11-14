@@ -24,9 +24,6 @@ def set_cores(requested, num_ops):
         available = len(Process().cpu_affinity())
     if not requested:
         return min(available, num_ops)
-    if requested > available:
-        msg = 'requested cores {} exceeds available cores {}'
-        raise(RuntimeError(msg.format(requested, available)))
     return min((requested, available, num_ops))
 
 def is_pickleable(obj):
