@@ -3,12 +3,15 @@
 """
 
 import functools
+import itertools
 import time
 from dataclasses import dataclass
+from operator import attrgetter
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
+import numpy as np
 import numpy.typing as npt
 from ebb.core import concurrency, metastores
 from ebb.masking import masks
@@ -18,7 +21,7 @@ from openseize import producer
 from openseize.spectra import estimators
 
 @dataclass
-class PSDItem:
+class PSDResult:
     """A class for keeping track of a PSD and all metadata."""
 
     path: Union[str, Path]
@@ -103,11 +106,11 @@ def estimate(
             if 'threshold' in combo_state:
                 if verbose:
                     print(f'Computing PSD for state: {combo_state}', end='\r')
-                maskedpro = producer(pro, chunksize=chunksize, axis=-1, mask=mask)
+                maskedpro = producer(pro, chunksize, axis=-1, mask=mask)
                 result_tup = estimators.psd(maskedpro, fs=fs, **kwargs)
                 # clear stdout line likely POSIX specific
                 print(end='\x1b[2K')
-                result.append(PSDItem(path.stem, combo_state, *result_tup))
+                result.append(PSDResult(path.stem, combo_state, *result_tup))
 
     return result
 
@@ -136,7 +139,33 @@ def batch(eeg_dir, state_dir, save_dir, pattern=r'[^_]+', ncores=12,
        results = pool.starmap(estimator, paired)
     elapsed = time.perf_counter() - t0
 
-    
+    # flatten the list of list
+    results = list(itertools.chain(*results))
+    # organize PSD results by state
+    unique_states = set([result.state for result in results])
+    state_results = []
+    for state in unique_states:
+        state_results.append([r for r in results if r.state == state])
+
+    psds = []
+    for subls in state_results:
+        psds.append(np.stack([r.psd for r in subls]))
+    psds = np.stack(psds, axis=0)
+
+    chs = range(psds.shape[2])
+    freqs = state_results[0][0].freqs
+    metaarray = metastores.MetaArray(
+                    psds,
+                    states = unique_states,
+                    paths = eeg_paths,
+                    channels = chs,
+                    frequencies=freqs)
+
+    save_path = Path(save_dir).joinpath('metaarray.pkl')
+    metaarray.save(save_path)
+
+    return metaarray
+
 
 
 
