@@ -188,7 +188,8 @@ if __name__ == '__main__':
     state_dir = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/spindle/states/'
     """
 
-    eeg_dir = '/media/matt/Zeus/claudia/test/standard/'
-    state_dir = '/media/matt/Zeus/claudia/test/spindle/'
-    results = batch(eeg_dir, state_dir, None)
+    eeg_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/standard/'
+    state_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/spindle_outputs/'
+    save_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/'
+    results = batch(eeg_dir, state_dir, save_dir)
 
