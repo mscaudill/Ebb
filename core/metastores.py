@@ -17,10 +17,18 @@ import functools
 import itertools
 import pickle
 import warnings
-from collections import abc
 from numbers import Number
 from pathlib import Path
-from typing import Callable, Dict, Iterator, Optional, Sequence, Tuple, Union
+from typing import (
+    Callable,
+    Dict,
+    Iterator,
+    Optional,
+    Self,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 import numpy.typing as npt
@@ -29,18 +37,15 @@ from ebb.core import mixins
 # Type definitions
 Coords = Dict[str, Union[Sequence, npt.NDArray, range]]
 
-# TODO 
-# save method that saves a dictionary
-# class method load that creates a MetaArray from a save dict
-# print does not show the order of the coords ViewInstance override?
-class MetaArray(mixins.ViewInstance):
-    """A representation of a numpy NDArray containing both the array &
-    coordinates, a dict of axes names & index labels.
 
-    MetaArrays offer simple storage and data selection by labels as opposed to
-    numpy numerical indexing. They are not a valid type for numerical processing
-    with numpy. More sophisticated software such as pandas or xarray support
-    numerical operations.
+class MetaArray(mixins.ViewInstance):
+    """An interface to a numpy array that stores a mapping of user defined
+    coordinates one per dimension in the array that can be used to select
+    subarrays by name.
+
+    MetaArrays are not drop-in replacements for numpy arrays as they do not
+    implement the protocol expected of numpy arrays (slicing, ufuncs etc.) More
+    sophisticated programs such as xarray do implement these protocols.
 
     Attrs:
         data:
@@ -70,18 +75,19 @@ class MetaArray(mixins.ViewInstance):
         True
     """
 
-    def __init__(self,
-                 data: npt.NDArray,
-                 metadata: Optional[Dict] = None,
-                 **coords: Coords,
+    def __init__(
+        self,
+        data: npt.NDArray,
+        metadata: Optional[Dict] = None,
+        **coords: Coords,
     ) -> None:
-        # FIXME docs must clarify that saving of obj attrs requires addition to
-        # metadata dict!
         """Initialize this MetaArray with an array & coordinates dictionary.
 
         Args:
             data:
                 An N-dimensional numpy array to represent.
+            metadata:
+                Any supplemental data a user may wish to store.
             coords:
                 A dictionary of axis name keys and index label values. The axis
                 names must be strings and label values must be sequence-like
@@ -99,7 +105,7 @@ class MetaArray(mixins.ViewInstance):
         self.metadata = metadata if metadata else {}
         self.coords = self._assign_coords(coords)
 
-    def _assign_coords(self, coords: Coords) -> Coords:
+    def _assign_coords(self, coords: Dict) -> Dict[str, Sequence]:
         """Validates and assigns coordinates to this MetaArray.
 
         Args:
@@ -118,14 +124,18 @@ class MetaArray(mixins.ViewInstance):
         result = copy.deepcopy(coords) if coords else default
 
         # convert labels for all axes to list instances
-        result = {name: list(labels) if not isinstance(labels, range) else
-                  labels for name, labels in result.items()}
+        result = {
+            name: list(labels) if not isinstance(labels, range) else labels
+            for name, labels in result.items()
+        }
 
         # validate dims & shape of coordinates
         coord_shape = tuple(len(v) for v in result.values())
         if coord_shape != self.shape:
-            msg = ("The shape of the coordinates must match data's shape"
-                    f"{coord_shape} != {self.shape}")
+            msg = (
+                "The shape of the coordinates must match data's shape"
+                f"{coord_shape} != {self.shape}"
+            )
             raise ValueError(msg)
 
         return result
@@ -136,9 +146,10 @@ class MetaArray(mixins.ViewInstance):
 
         return self.data.shape
 
-    def to_indices(self,
-                   name: str,
-                   labels: Sequence,
+    def to_indices(
+        self,
+        name: str,
+        labels: Sequence,
     ) -> Tuple[int, Sequence]:
         """Converts labels along a named axis in coordinates to numeric indices.
 
@@ -158,10 +169,10 @@ class MetaArray(mixins.ViewInstance):
 
         return axis, indices
 
-    def select(self,
-               **selections: Union[Number, str, Sequence, npt.NDArray],
-    ) -> 'MetaArray':
-        # MYPY not denoting return as MetaArray type
+    def select(
+        self,
+        **selections: Union[Number, str, Sequence, npt.NDArray],
+    ) -> Self:
         """Returns a new MetaArray by slicing this MetaArray with axis names &
         labels in selections.
 
@@ -181,7 +192,6 @@ class MetaArray(mixins.ViewInstance):
         data = self.data
 
         for name, labels in selections.items():
-
             # all labels converted to list for to_indices
             labels = [labels] if isinstance(labels, Number) else list(labels)
             axis, indices = self.to_indices(name, labels)
@@ -197,13 +207,21 @@ class MetaArray(mixins.ViewInstance):
 
         return instance
 
-    def to_dict(self):
+    def to_dict(self) -> Dict:
         """Returns a dictionary representation of this MetaArray."""
 
         return dict(data=self.data, coords=self.coords, metadata=self.metadata)
 
     def save(self, path: Union[str, Path]) -> None:
-        """ """
+        """Pickles a dict representation of this MetaArray to a file at path.
+
+        Args:
+            path:
+                Save location of this MetaArray's dict representation.
+
+        Returns:
+            None
+        """
 
         path = Path(path)
         with open(path, 'wb') as outfile:
@@ -211,12 +229,21 @@ class MetaArray(mixins.ViewInstance):
 
     @classmethod
     def load(cls, path: Union[str, Path]) -> 'MetaArray':
-        """ """
+        """Creates a new MetaArray instance from a dict representation on disk.
+
+        Args:
+            path:
+                Path to file containing a dict representation of a MetaArray.
+
+        Returns:
+            A new MetaArray instance.
+        """
 
         path = Path(path)
         with open(path, 'rb') as infile:
             metadict = pickle.load(infile)
 
+        # construct and return a new instance
         data = metadict['data']
         metadata = metadict['metadata']
         coords = metadict['coords']
@@ -288,13 +315,12 @@ class MetaMask(mixins.ViewInstance):
         for names in itertools.combinations(self.names, r=r):
             yield self(*names, logical=logical)
 
-
     def __call__(
         self,
         *names,
         logical=np.logical_and,
         **kwargs,
-    ) -> Tuple[Tuple[str,...], npt.NDArray[np.bool_]]:
+    ) -> Tuple[Tuple[str, ...], npt.NDArray[np.bool_]]:
         """Returns the element-wise logical combination of named masks.
 
         Args:
@@ -313,9 +339,10 @@ class MetaMask(mixins.ViewInstance):
         lengths = np.array([len(m) for m in submasks])
         min_length = np.min(lengths)
         if any(lengths - min_length):
-
-            msg = (f'Mask lengths are inconsistent lengths = {lengths}.'
-                   f'Truncating masks to minimum length = {min_length}')
+            msg = (
+                f'Mask lengths are inconsistent lengths = {lengths}.'
+                f'Truncating masks to minimum length = {min_length}'
+            )
             warnings.warn(msg)
 
             submasks = [mask[:min_length] for mask in submasks]
@@ -334,19 +361,3 @@ class MetaMask(mixins.ViewInstance):
         """
 
         return name in self.names
-
-
-if __name__ == '__main__':
-
-    import numpy as np
-
-
-    data = np.random.random((3,4,6))
-    m0 = MetaArray(data, trials=['a', 'b', 'c'], cnts=(1,2,3,4), times=range(6))
-    m0.save('./test.pkl')
-
-
-    """
-    m = MetaMask(state=[1,0,0,1], threshold=[1,1,0,0], x=[0, 1,1, 1])
-    """
-
