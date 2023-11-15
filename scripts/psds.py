@@ -1,48 +1,48 @@
-"""A script for computing and storing EEG Metrics and/or Biomarkers.
-
+"""A script for computing EEG PSDs stored as MetaArrays with shape
+(spindle_state x file x channels x frequencies).
 """
 
 import functools
-import itertools
 import time
 from dataclasses import dataclass
-from operator import attrgetter
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
 from ebb.core import concurrency, metastores
 from ebb.masking import masks
 from ebb.scripts.file_combine import pair
-from openseize.file_io import edf
 from openseize import producer
+from openseize.file_io import edf
 from openseize.spectra import estimators
+
 
 @dataclass
 class PSDResult:
     """A class for keeping track of a PSD and all metadata."""
 
     path: Union[str, Path]
-    state: Tuple[str,...]
+    state: Tuple[str, ...]
     estimatives: int
     freqs: npt.NDArray
     psd: npt.NDArray
 
+
 def estimate(
     path: Union[str, Path],
     state_path: Union[str, Path],
-    channels: List = [0,1,2],
+    channels: List = [0, 1, 2],
     fs: float = 200,
-    chunksize: int = 30e5,
+    chunksize: int = int(30e5),
     labels: Dict = {'wake': ['w'], 'sleep': ['n', 'r']},
     winsize: float = 180,
     nstds: float = 5,
     radius: float = 0.5,
     verbose: bool = True,
     **kwargs,
-) -> Dict[str, Tuple[int, npt.NDArray, npt.NDArray]]:
+) -> List[PSDResult]:
     """Estimates the Power spectral density of EEG data stored to an EDF at path
     for each state in a states path CSV file.
 
@@ -78,14 +78,12 @@ def estimate(
             All kwargs are passed to openseize's psd estimator function.
 
     Returns:
-        A list of Tuples one per state in labels and each containing (count,
-        freqs, psd) where count is the number of estimatives (i.e. averaged
-        windows); freqs are the frequencies at which the PSD is estimated; psd
-        are the psd values array with shape chs x freqs.
+        A list of PSDResult instances one per file and state in paths and
+        labels.
     """
 
+    path, state_path = Path(path), Path(state_path)
     with edf.Reader(path) as reader:
-
         # build a producer
         reader.channels = channels
         pro = producer(reader, chunksize=chunksize, axis=-1)
@@ -114,9 +112,33 @@ def estimate(
 
     return result
 
-def batch(eeg_dir, state_dir, save_dir, pattern=r'[^_]+', ncores=12,
-        verbose=True, **kwargs):
-    """ """
+def batch(
+    eeg_dir: Union[str, Path],
+    state_dir: Union[str, Path],
+    pattern=r'[^_]+',
+    ncores: Optional[int] = None,
+    **kwargs,
+) -> List[PSDResult]:
+    """Concurrently estimates PSDResults from a directories of EEG files and
+    Spindle state files.
+
+    Args:
+        eeg_dir:
+            Directory to EEG files to estimate PSDs of.
+        state_dir:
+            Directory of spindle files one per EEG file in eeg_dir indicating
+            sleep states.
+        pattern:
+            A regex string for pairing EEG files with Spindle state files.
+        ncores:
+            The number of processing cores to utilize to concurrently process
+            EEG files.
+        kwargs:
+            Any valid kwarg for the estimate function.
+
+    Returns:
+        A list of lists of PSDResults, one PSD result for each file and state.
+    """
 
     # remove any path arguments from kwargs
     [kwargs.pop(x, None) for x in ('path', 'state_path')]
@@ -126,52 +148,71 @@ def batch(eeg_dir, state_dir, save_dir, pattern=r'[^_]+', ncores=12,
     state_paths = list(Path(state_dir).glob('*.csv'))
     paired = pair(eeg_paths + state_paths, pattern=pattern)
 
+    # set number of cpu workers and print to stdout
     workers = concurrency.set_cores(ncores, len(paired))
-    if verbose:
-        msg = (f'Executing Batched PSD on {len(eeg_paths)} files using'
-               f' {workers} cores.')
-        print(msg)
+    msg = f'Executing Batch on {len(paired)} files using' f' {workers} cores.'
+    print(msg)
 
     # construct a partial to pass to Multiprocess pool
     estimator = functools.partial(estimate, verbose=False, **kwargs)
     t0 = time.perf_counter()
     with Pool(workers) as pool:
-       results = pool.starmap(estimator, paired)
+        results = pool.starmap(estimator, paired)
     elapsed = time.perf_counter() - t0
+    print(f'Batch processed {len(paired)} files in {elapsed} secs')
 
-    # flatten the list of list
-    results = list(itertools.chain(*results))
+    # flatten the list of list of PSDResult data instances
+    return [obj for sublist in results for obj in sublist]
+
+def as_metaarray(
+    results: List[PSDResult], savedir: Optional[Union[str, Path]] = None
+) -> metastores.MetaArray:
+    """Creates and saves a MetaArray of PSDs from batch estimate.
+
+    Args:
+        results:
+            A list of PSDResult instances returned by batch.
+        savedir:
+            A dir where the MetAarray called PSDs.pkl will be saved to. If None,
+            the metaarray will not be saved.
+
+    Returns:
+        A MetaArray instance.
+    """
+
     # organize PSD results by state
-    unique_states = set([result.state for result in results])
-    state_results = []
-    for state in unique_states:
-        state_results.append([r for r in results if r.state == state])
+    states = set([result.state for result in results])
+    grouped = []
+    for state in states:
+        grouped.append([obj for obj in results if obj.state == state])
 
-    psds = []
-    for subls in state_results:
-        psds.append(np.stack([r.psd for r in subls]))
-    psds = np.stack(psds, axis=0)
+    # extract and stack psds for each state in grouped
+    datums = [np.stack([obj.psd for obj in group]) for group in grouped]
+    data = np.stack(datums)
+    # extract paths from first group -- each group preserves this order
+    paths = [obj.path for obj in grouped[0]]
 
-    chs = range(psds.shape[2])
-    freqs = state_results[0][0].freqs
+    # get the estimatives
+    estimatives = [obj.estimatives for group in grouped for obj in group]
+
+    # build and save a metaarray
     metaarray = metastores.MetaArray(
-                    psds,
-                    states = unique_states,
-                    paths = eeg_paths,
-                    channels = chs,
-                    frequencies=freqs)
+        data,
+        metadata={'estimatives': estimatives},
+        states=states,
+        paths=paths,
+        channels=range(data.shape[2]),
+        frequencies=results[0].freqs,
+    )
 
-    save_path = Path(save_dir).joinpath('metaarray.pkl')
-    metaarray.save(save_path)
+    if savedir:
+        savepath = Path(savedir).joinpath('PSDs.pkl')
+        metaarray.save(savepath)
 
     return metaarray
 
 
-
-
-
 if __name__ == '__main__':
-
     """
     fp = ('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/standard/'
           'CW0DA1_P096_KO_15_53_3dayEEG_2020-04-13_08_58_30_PREPROCESSED.edf')
@@ -188,8 +229,10 @@ if __name__ == '__main__':
     state_dir = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/spindle/states/'
     """
 
-    eeg_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/standard/'
-    state_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/spindle_outputs/'
-    save_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/'
-    results = batch(eeg_dir, state_dir, save_dir)
+
+
+    eeg_dir = '/media/matt/Zeus/claudia/test/standard/'
+    state_dir = '/media/matt/Zeus/claudia/test/spindle/'
+    results = batch(eeg_dir, state_dir)
+    marray = as_metaarray(results)
 
