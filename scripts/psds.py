@@ -34,7 +34,7 @@ def estimate(
     path: Union[str, Path],
     state_path: Union[str, Path],
     channels: List = [0, 1, 2],
-    fs: float = 200,
+    fs: float = 250,
     chunksize: int = int(30e5),
     labels: Dict = {'wake': ['w'], 'nrem': ['n'], 'rem': ['r'], 'sleep': ['n', 'r']},
     winsize: float = 180,
@@ -213,7 +213,8 @@ def as_metaarray(
 
 
 if __name__ == '__main__':
-    
+   
+    """
     fp = ('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/standard/'
           'CW0DA1_P096_KO_15_53_3dayEEG_2020-04-13_08_58_30_PREPROCESSED.edf')
 
@@ -222,16 +223,11 @@ if __name__ == '__main__':
                   '-04-13_08_58_30_PREPROCESSED_SPINDLE_labels.csv')
 
     results = estimate(fp, state_path, verbose=True)
+    """
     
 
-    """
-    eeg_dir = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/standard/'
-    state_dir = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/spindle/states/'
-    """
+    eeg_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/standard/'
+    state_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/spindle/spindle_csv/'
 
-    """
-    eeg_dir = '/media/matt/Zeus/claudia/test/standard/'
-    state_dir = '/media/matt/Zeus/claudia/test/spindle/'
     results = batch(eeg_dir, state_dir)
     marray = as_metaarray(results)
-    """
