@@ -231,8 +231,9 @@ if __name__ == '__main__':
 
 
 
-    eeg_dir = '/media/matt/Zeus/claudia/test/standard/'
-    state_dir = '/media/matt/Zeus/claudia/test/spindle/'
+    eeg_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/standard/'
+    state_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/spindle_outputs/'
+    save_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/'
     results = batch(eeg_dir, state_dir)
-    marray = as_metaarray(results)
+    marray = as_metaarray(results, save_dir)
 
