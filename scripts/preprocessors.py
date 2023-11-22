@@ -218,10 +218,8 @@ def batch(preprocessor, dirpath, target=None, ncores=None, verbose=True, **kwarg
 if __name__ == '__main__':
 
     #Compute standard preprocessed edfs
-    """
     basepath = '/media/matt/DataD/Xue/EbbData/6_week_post/'
-    batch(standard, basepath, fs=5000, downsample=25)
-    """
+    batch(standard, basepath, fs=5000, downsample=20)
 
     """
     # Compute spindle edfs from standard processed edfs
