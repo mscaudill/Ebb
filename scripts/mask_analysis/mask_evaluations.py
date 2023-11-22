@@ -126,7 +126,7 @@ def make_metamask(epath, apath, spath, verbose=False):
     # production Args
     CHS = [0, 1, 2]
     FS = 5000
-    M = 20
+    M = 25
     CSIZE = 30E5 # LOW ENOUGH TO ALLOW MULTIPROCESSING TO COPY
     AXIS = -1
 
@@ -134,8 +134,8 @@ def make_metamask(epath, apath, spath, verbose=False):
     NSTDS = [3, 4, 5, 6]
     #WINSIZE = 1.5E4 # @ FS = 250 THIS IS 60 SECS OF DATA
     #WINSIZE = 1.5E5 # @ FS = 250 THIS IS 600 SECS OF DATA
-    #WINSIZE = 3.6E4 # @FS = 200 THIS IS 180 SECS
-    WINSIZE = 1.2E5 #@FS = 200 this is 600 secs of data 
+    WINSIZE = 3.6E4 # @FS = 200 THIS IS 180 SECS
+    #WINSIZE = 1.2E5 #@FS = 200 this is 600 secs of data 
     RADIUS = 100 # THIS 1/2 sec at FS=200
 
     # annotation Args
@@ -143,7 +143,7 @@ def make_metamask(epath, apath, spath, verbose=False):
     LABELS = ['Artifact', 'Artifact ','water_drinking','water_drinking '
               '']
     DFS = FS // M
-    BETWEEN = ['Start', 'Stop']
+    BETWEEN = ['Heet Start', 'Heet Stop']
 
     # State Args
     STATE_LABELS = [['w'], ['r', 'n']]
@@ -298,6 +298,20 @@ def evaluate(dirpath, savepath=None, ncores=None):
 
 if __name__ == '__main__':
 
+    basepath = Path('/media/matt/DataD/Xue/EbbData/6_week_post/mask_test/')
+
+    """
+    efile = 'CW0DA1_P096_KO_15_53_3dayEEG_2020-04-13_08_58_30.edf'
+    afile = 'CW0DA1_P096_KO_15_53_3dayEEG_2020-04-13_08_58_30.txt'
+    sfile = ('CW0DA1_P096_KO_15_53_3dayEEG_2020-04-13_08_58_30'
+             '_PREPROCESSED_SPINDLE_labels.csv')
+
+    epath, apath, spath = [basepath.joinpath(x) for x in [efile, afile, sfile]]
+    #result = evaluate_metamask(epath, apath, spath)
+    """
+
+    performances = evaluate(dirpath=basepath)
+
     """
     import numpy as np
     basepath = Path('/media/matt/Zeus/jasmine/ube3a')
@@ -315,8 +329,10 @@ if __name__ == '__main__':
     with open(save_path, 'wb') as outfile:
         pickle.dump(metamask, outfile)
     """
-  
+ 
+    """
     dirpath = Path('/media/matt/Zeus/jasmine/stxbp1')
     performances = evaluate(dirpath,
         savepath=('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/mask_parameter_testing/'
                   'stxbp1_mask_performances_avg10mins_radius0pt5secs.pkl'))
+    """
