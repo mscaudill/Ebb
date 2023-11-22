@@ -40,13 +40,12 @@ def standard(
     savedir: Union[str, Path],
     fs: float,
     downsample: int,
-    notch_width: float = 6,
     trim_to: Sequence = [48, 72],
     chunksize=30e5,
     axis=-1,
     verbose=True,
 ) -> None:
-    """A standard preprocessor that notch filters, downsamples and trims data.
+    """A standard preprocessor that downsamples and trims data.
 
     Args:
         path:
@@ -59,8 +58,6 @@ def standard(
             The sampling rate of the data at path.
         downsample:
             The downsample factor to reduce the sampling rate of the data.
-        notch_width:
-            The width of the notch filter that will be applied to the data.
         trim_to:
             A sequence of hours for trimming the data. The trim amount is the
             largest trim_to amount that is below the data's actual length. E. if
@@ -101,12 +98,7 @@ def standard(
 
     # build producer
     pro = masks.between_pro(reader, 0, stop, chunksize, axis)
-    # Notch filter and downsample the producer
-    notch = iir.Notch(60, width=notch_width, fs=fs)
-    result = notch(pro, chunksize, axis, dephase=False)
-
-    # FIXME  FILE CW0DC2 fails to resample!!!
-    result = resampling.downsample(result, downsample, fs, chunksize, axis)
+    result = resampling.downsample(pro, downsample, fs, chunksize, axis)
     # FIXME openseize 1.3.0 to support write from producer
     processed = result.to_array()
 
@@ -231,7 +223,9 @@ if __name__ == '__main__':
     batch(standard, basepath, fs=5000, downsample=25)
     """
 
+    """
     # Compute spindle edfs from standard processed edfs
     standard_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/standard/'
     target = '/media/matt/DataD/Xue/EbbData/6_week_post/spindle/'
     batch(spindle, standard_dir, target=target, channels=[0, 1, 3])
+    """
