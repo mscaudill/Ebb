@@ -24,7 +24,6 @@ from typing import (
     Dict,
     Iterator,
     Optional,
-    Self,
     Sequence,
     Tuple,
     Union,
@@ -172,7 +171,7 @@ class MetaArray(mixins.ViewInstance):
     def select(
         self,
         **selections: Union[Number, str, Sequence, npt.NDArray],
-    ) -> Self:
+    ) -> 'MetaArray':
         """Returns a new MetaArray by slicing this MetaArray with axis names &
         labels in selections.
 

@@ -36,7 +36,7 @@ def estimate(
     channels: List = [0, 1, 2],
     fs: float = 200,
     chunksize: int = int(30e5),
-    labels: Dict = {'wake': ['w'], 'sleep': ['n', 'r']},
+    labels: Dict = {'wake': ['w'], 'nrem': ['n'], 'rem': ['r'], 'sleep': ['n', 'r']},
     winsize: float = 180,
     nstds: float = 5,
     radius: float = 0.5,
@@ -213,27 +213,33 @@ def as_metaarray(
 
 
 if __name__ == '__main__':
-    """
+    
     fp = ('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/standard/'
           'CW0DA1_P096_KO_15_53_3dayEEG_2020-04-13_08_58_30_PREPROCESSED.edf')
 
-    state_path = ('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/spindle/'
+    state_path = ('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/spindle/states/'
                   'CW0DA1_P096_KO_15_53_3dayEEG_2020' + \
                   '-04-13_08_58_30_PREPROCESSED_SPINDLE_labels.csv')
 
     results = estimate(fp, state_path, verbose=True)
-    """
+    
 
     """
     eeg_dir = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/standard/'
     state_dir = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/spindle/states/'
     """
 
-
-
+    """
     eeg_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/standard/'
     state_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/spindle_outputs/'
     save_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/'
     results = batch(eeg_dir, state_dir)
     marray = as_metaarray(results, save_dir)
+    """
 
+    """
+    eeg_dir = '/media/matt/Zeus/claudia/test/standard/'
+    state_dir = '/media/matt/Zeus/claudia/test/spindle/'
+    results = batch(eeg_dir, state_dir)
+    marray = as_metaarray(results)
+    """
