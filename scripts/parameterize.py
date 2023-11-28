@@ -2,10 +2,12 @@
 
 """
 import copy
+import csv
 from pathlib import Path
+import pickle
 from typing import List, Optional, Tuple, Union
 from functools import partial
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
@@ -100,12 +102,19 @@ class Parameterizer:
         self.freq_range = freq_range
         self.freqs = np.array(psds.coords.pop('frequencies'))
         self.items = list(itertools.product(*psds.coords.values()))
-        self.target, self.idx = self.init_data(target)
         self.kwargs = kwargs
 
         # initialize FOOOF models for both aperiodic modes
         modes = ['fixed', 'knee']
         self.models = {m: FOOOF(aperiodic_mode=m, **kwargs) for m in modes}
+
+        # populate instance with presaved fits
+        self.target = None
+        self.to_save = {}
+        self.idx = 0
+        if target:
+            self.target = Path(target)
+            self.init_data()
 
         # initialize this Parameterizer's widgets
         self.init_figure(figsize)
@@ -114,38 +123,38 @@ class Parameterizer:
         self.add_buttons()
         self.add_save()
         self.update_info()
+
         # update the plot & show
         self.update()
         plt.ion()
         plt.show()
 
-    def init_data(self, target):
-        """Returns a Path instance to a pickle of Fitted results creating one
-        if needed and sets the index to the next unsaved item.
+    def init_data(self):
+        """Populates this Parameterizer with presaved fits and sets the index as
+        the first item following the last saved item."""
 
-        Args:
-            target:
-                A path location where new fits will be saved to. If None, target
-                is None type.
+        if not self.target.exists():
+            return
+        x = self.read()
+        self.to_save = {idx: Fitted(**fitdict) for idx, fitdict in x.items()}
+        self.idx = list(self.to_save.keys())[-1] + 1
+        print(f'Parameterizer populated with presaved fits from\n{self.target}')
 
-        Returns:
-            A tuple (Path location, item index).
-        """
+    def read(self):
+        """Reads presaved fooof fits from this Parameterizer's target."""
 
-        if not target:
-            idx = 0
-            target = None
-        else:
-            target = Path(target)
-            if target.exists():
-                # for presaved data find the first unsaved item
-                with open(target, 'rb') as infile:
-                    presaved = pickle.load(infile)
-                    idx = self.items.index(presaved[-1]) + 1
-            else:
-                idx = 0
+        with open(target, 'rb') as infile:
+            result = pickle.load(infile)
+        return result
 
-        return target, idx
+    def write(self):
+        """Writes fooof fits to this Parameterizer's target."""
+
+        if not self.target.parent.exists():
+            Path.mkdir(self.target.parent, parents=False)
+        dicts = {idx: asdict(fitted) for idx, fitted in self.to_save.items()}
+        with open(target, 'wb') as outfile:
+            pickle.dump(dicts, outfile)
 
     def init_figure(self, figsize: Tuple[float, float]) -> None:
         """Stores a formatted matplolib figure and axis array to this
@@ -158,6 +167,15 @@ class Parameterizer:
 
         self.fig, self.axarr = plt.subplots(1, 2, figsize=figsize)
         self.fig.subplots_adjust(left=0.08, bottom=0.1, right=.82, top=0.90)
+        self.fig.canvas.mpl_connect('close_event', self.on_close)
+
+    def on_close(self, event):
+        """On close of this Parameterizer save Fitted instances to target."""
+
+        if self.target:
+            print(f'Writing data to {self.target}')
+            self.write()
+            print('Write Complete!')
 
     def add_forward(self):
         """Configures and stores a button to advance the currently displayed
@@ -202,32 +220,39 @@ class Parameterizer:
         self.save_button.label.set_fontsize(16)
         self.save_button.on_clicked(self.save)
 
+    def fetch_trace(self):
+        """Returns the data trace of this Parameterizer's current item index."""
+
+        names = 'states paths channels'.split()
+        selectors = {k: [v] for k, v in zip(names, self.items[self.idx])}
+        return self.psds.select(**selectors).data.squeeze()
+
     def save(self, event):
-        """ """
+        """Adds the currently displayed fit of this parameterizer to the save
+        list."""
 
-        aperiodic_mode = self.radio_buttons.value_selected
+        # get parameters to build fitted 
         state, path, ch = self.items[self.idx]
-        data = self.psds.select(
-                states=[state],
-                paths=[path],
-                channels=[ch]).data.squeeze()
-
+        aperiodic_mode = self.radio_buttons.value_selected
+        data = self.fetch_trace()
         model = self.models[aperiodic_mode]
         fitted = Fitted(
-                state,
-                path,
-                ch,
-                model.freqs,
-                model.power_spectrum,
-                model.peak_width_limits,
-                model.max_n_peaks,
-                model.min_peak_height,
-                model.peak_threshold,
-                model.aperiodic_mode,
-                model.freq_range)
-        print(fitted)
-
-        # open the file if it exist, create it if it doesn't and write to it!
+                    state,
+                    path,
+                    ch,
+                    model.freqs,
+                    model.power_spectrum,
+                    model.peak_width_limits,
+                    model.max_n_peaks,
+                    model.min_peak_height,
+                    model.peak_threshold,
+                    model.aperiodic_mode,
+                    model.freq_range,
+                    )
+        # update the save list
+        self.to_save.update({self.idx: fitted})
+        print((f'Adding to save list:\nState: {state}\nPath: {path:10}'
+            f'\nChannel: {ch}\nAperiodic mode: {aperiodic_mode}\n'))
 
     def add_buttons(self):
         """Adds a panel to select 'fixed' or 'knee' parameter for the aperiodic
@@ -239,8 +264,8 @@ class Parameterizer:
         self.radio_buttons.set_label_props({'fontsize':[16, 16]})
 
     def update_info(self):
-        """ """
-        
+        """Updates this Parameterizer's displayed item information."""
+
         if hasattr(self, 'textvar'):
             self.textvar.set_text('')
         state, path, ch = self.items[self.idx]
@@ -248,24 +273,29 @@ class Parameterizer:
         self.textvar = self.fig.text(0.83, 0.45, info, size=10)
 
     def update(self):
-        """ """
+        """Updates the plotted FOOOF model."""
 
         [ax.clear() for ax in self.axarr]
 
+        # update aperiodic mode if this items data is already fit
+        if self.idx in self.to_save:
+            presaved = self.to_save[self.idx]
+            idx = ['fixed', 'knee'].index(presaved.aperiodic_mode)
+            self.radio_buttons.set_active(idx)
+
+        # get the data trace and make a FOOOF model fit
         state, path, ch = self.items[self.idx]
-        data = self.psds.select(
-                states=[state],
-                paths=[path],
-                channels=[ch]).data.squeeze()
+        data = self.fetch_trace()
         for model in self.models.values():
-            # probably need to interpolate here at line noise
             model.fit(self.freqs, data, freq_range=self.freq_range)
 
+        # plot the FOOOF model's fit
         for idx, (name, model) in enumerate(self.models.items()):
             model.plot(plot_peaks='dot', plt_log=True, ax=self.axarr[idx])
-            title = f'{name.upper()} Fit'
+            title = f'{name.upper()} Fit R^2 = {model.r_squared_:.4f}'
             self.axarr[idx].set_title(title)
 
+        # configure plots and update item info
         self.axarr[-1].legend().set_visible(False)
         self.axarr[-1].set_ylabel('')
         self.update_info()
@@ -273,27 +303,10 @@ class Parameterizer:
         plt.draw()
 
 
-
-
-
-
-
 if __name__ == '__main__':
 
     path = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/PSDs.pkl'
     marr = MetaArray.load(path)
-
-    """
-    state = ('threshold', 'wake')
-    path = 'CW0DD2_P106_KO_94_32_3dayEEG_2020-04-29_09_56_19_PREPROCESSED'
-    channel=0
-    freq_range=(4, 100)
-    """
-
-    """
-    fitted = parameterize(marr, state, path, channel, freq_range,
-            peak_width_limits=(1,15))
-    """
 
     target = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/fits/foof_fits.pkl'
     param = Parameterizer(marr, (4,100), target=target, peak_width_limits=(2,10))
