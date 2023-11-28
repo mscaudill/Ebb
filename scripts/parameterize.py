@@ -1,22 +1,27 @@
-"""
+"""This module contains a Parameterizer for interactively creating FOOOF fits
+for each PSD trace in a PSD meta-array, saving the parameters needed to
+reconstruct the fits to a file. The intent of this interactive plot is to aid
+users in choosing the aperiodic mode parameter. Please see tutorial 5 of:
+
+https://fooof-tools.github.io/fooof/auto_tutorials/
 
 """
 import copy
 import csv
-from pathlib import Path
+import itertools
 import pickle
-from typing import List, Optional, Tuple, Union
+from dataclasses import asdict, dataclass
 from functools import partial
-from dataclasses import dataclass, asdict
-import numpy as np
+from pathlib import Path
+from typing import List, Optional, Tuple, Union
+
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 from ebb.core.metastores import MetaArray
 from fooof import FOOOF
-import itertools
-import matplotlib.pyplot as plt
 from matplotlib import widgets
+
 
 @dataclass
 class Fitted:
@@ -231,7 +236,7 @@ class Parameterizer:
         """Adds the currently displayed fit of this parameterizer to the save
         list."""
 
-        # get parameters to build fitted 
+        # get parameters to build fitted
         state, path, ch = self.items[self.idx]
         aperiodic_mode = self.radio_buttons.value_selected
         data = self.fetch_trace()
