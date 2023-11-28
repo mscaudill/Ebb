@@ -219,8 +219,9 @@ if __name__ == '__main__':
 
     #Compute standard preprocessed edfs
     
-    #basepath = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3'
-    #batch(standard, basepath, fs=5000, downsample=25)
+    basepath = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3'
+    target = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/standard'
+    batch(standard, basepath, target = target, fs=5000, downsample=20)
   
     """
     missing = {'CW3693'}
@@ -251,12 +252,14 @@ if __name__ == '__main__':
                  
 
         print(f'File {path.stem} saved!')
-    #standard_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/standard/'
-    #target = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/spindle/'
-    #batch(spindle, standard_dir, target=target, channels=[0, 1, 3])
-    """
+    
+    standard_dir = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/standard/'
+    target = '/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3/spindle/'
+    batch(spindle, standard_dir, target=target, channels=[0, 1, 3])
+    
 
     # Compute spindle edfs from standard processed edfs
     standard_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/standard/'
     target = '/media/matt/DataD/Xue/EbbData/6_week_post/spindle/'
     batch(spindle, standard_dir, target=target, channels=[0, 1, 3])
+    """

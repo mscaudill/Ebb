@@ -173,5 +173,5 @@ def combine_edf(
 
 if __name__ == '__main__':
 
-    dirpath = Path('/media/matt/DataD/Xue/EbbData/6_week_post')
+    dirpath = Path('/media/claudia/Data_A/claudia/STXBP1_High_Dose_Exps_3')
     combine_edf(dirpath, fs=5000)
