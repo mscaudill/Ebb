@@ -4,6 +4,7 @@
 
 import functools
 import time
+from collections import defaultdict
 from dataclasses import dataclass
 from multiprocessing import Pool
 from pathlib import Path
@@ -180,27 +181,32 @@ def as_metaarray(
         A MetaArray instance.
     """
 
-    # organize PSD results by state
-    states = set([result.state for result in results])
-    grouped = []
-    for state in states:
-        grouped.append([obj for obj in results if obj.state == state])
+    # organize the PSDResult instances by state
+    by_state = defaultdict(list)
+    for result in results:
+        by_state[result.state].append(result)
 
-    # extract and stack psds for each state in grouped
-    datums = [np.stack([obj.psd for obj in group]) for group in grouped]
-    data = np.stack(datums)
-    # extract paths from first group -- each group preserves this order
-    paths = [obj.path for obj in grouped[0]]
+    # stack result psds across paths within a state and then across states
+    arrs = []
+    for resultants in by_state.values():
+        arrs.append(np.stack([result.psd for result in resultants]))
+    data = np.stack(arrs)
 
-    # get the estimatives
-    estimatives = [obj.estimatives for group in grouped for obj in group]
+    # get the names from the paths (Xue lab specific)
+    names = [result.path[:6] for result in list(by_state.values())[0]]
+
+    # store each estimative by state and path
+    estimatives = {}
+    for state, results in by_state.items():
+        estimatives[state] = [res.estimatives for res in results]
+    estimatives['names'] = names
 
     # build and save a metaarray
     metaarray = metastores.MetaArray(
         data,
         metadata={'estimatives': estimatives},
-        states=states,
-        paths=paths,
+        states=list(by_state.keys()),
+        names=names,
         channels=range(data.shape[2]),
         frequencies=results[0].freqs,
     )
@@ -213,21 +219,18 @@ def as_metaarray(
 
 
 if __name__ == '__main__':
-   
-    """
-    fp = ('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/standard/'
-          'CW0DA1_P096_KO_15_53_3dayEEG_2020-04-13_08_58_30_PREPROCESSED.edf')
 
-    state_path = ('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/spindle/states/'
-                  'CW0DA1_P096_KO_15_53_3dayEEG_2020' + \
-                  '-04-13_08_58_30_PREPROCESSED_SPINDLE_labels.csv')
-
-    results = estimate(fp, state_path, verbose=True)
-    """
-    
+    import pickle
+    from dataclasses import asdict
 
     eeg_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/standard/'
     state_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/spindle/spindle_csv/'
 
     results = batch(eeg_dir, state_dir)
-    marray = as_metaarray(results)
+    #marray = as_metaarray(psd_results)
+
+    """For testing save results out as dicts."""
+    r = [asdict(result) for result in results]
+    fp = '/media/matt/DataD/Xue/EbbData/6_week_post/standard/psd_results.pkl'
+    with open(fp, 'wb') as outfile:
+        pickle.dump(r, outfile)
