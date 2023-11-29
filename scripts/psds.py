@@ -212,7 +212,7 @@ def as_metaarray(
     )
 
     if savedir:
-        savepath = Path(savedir).joinpath('PSDs.pkl')
+        savepath = Path(savedir).joinpath('psd_metaarray.pkl')
         metaarray.save(savepath)
 
     return metaarray
@@ -227,10 +227,11 @@ if __name__ == '__main__':
     state_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/spindle/spindle_csv/'
 
     results = batch(eeg_dir, state_dir)
-    #marray = as_metaarray(psd_results)
+    marray = as_metaarray(psd_results)
 
-    """For testing save results out as dicts."""
+    """For testing save results out as dicts.
     r = [asdict(result) for result in results]
     fp = '/media/matt/DataD/Xue/EbbData/6_week_post/standard/psd_results.pkl'
     with open(fp, 'wb') as outfile:
         pickle.dump(r, outfile)
+    """
