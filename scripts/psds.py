@@ -192,21 +192,21 @@ def as_metaarray(
         arrs.append(np.stack([result.psd for result in resultants]))
     data = np.stack(arrs)
 
-    # get the names from the paths (Xue lab specific)
-    names = [result.path[:6] for result in list(by_state.values())[0]]
+    # get the paths
+    paths = [result.path for result in list(by_state.values())[0]]
 
     # store each estimative by state and path
     estimatives = {}
     for state, results in by_state.items():
         estimatives[state] = [res.estimatives for res in results]
-    estimatives['names'] = names
+    estimatives['paths'] = paths
 
     # build and save a metaarray
     metaarray = metastores.MetaArray(
         data,
         metadata={'estimatives': estimatives},
         states=list(by_state.keys()),
-        names=names,
+        paths=paths,
         channels=range(data.shape[2]),
         frequencies=results[0].freqs,
     )
@@ -225,9 +225,10 @@ if __name__ == '__main__':
 
     eeg_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/standard/'
     state_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/spindle/spindle_csv/'
+    save_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/standard/'
 
     results = batch(eeg_dir, state_dir)
-    marray = as_metaarray(psd_results)
+    marray = as_metaarray(results, savedir=save_dir)
 
     """For testing save results out as dicts.
     r = [asdict(result) for result in results]
@@ -235,3 +236,4 @@ if __name__ == '__main__':
     with open(fp, 'wb') as outfile:
         pickle.dump(r, outfile)
     """
+    
