@@ -310,9 +310,10 @@ class Parameterizer:
 
 if __name__ == '__main__':
 
-    path = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/PSDs.pkl'
+    path = ('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/standard/'
+            'normed_psd_metaarray.pkl')
     marr = MetaArray.load(path)
 
     # target=None view only mode
     target = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/fits/foof_fits.pkl'
-    param = Parameterizer(marr, (4,100), target=target, peak_width_limits=(2,10))
+    param = Parameterizer(marr, (4,100), target=None, peak_width_limits=(2,10))
