@@ -2,6 +2,7 @@
 (spindle_state x file x channels x frequencies).
 """
 
+import copy
 import functools
 import time
 from collections import defaultdict
@@ -17,7 +18,7 @@ from ebb.masking import masks
 from ebb.scripts.file_combine import pair
 from openseize import producer
 from openseize.file_io import edf
-from openseize.spectra import estimators
+from openseize.spectra import estimators, metrics
 
 
 @dataclass
@@ -217,6 +218,34 @@ def as_metaarray(
 
     return metaarray
 
+def normalize(
+        marray: metastores.MetaArray,
+        freq_range: Tuple[float, float],
+) -> metastores.MetaArray:
+    """Normalizes the power spectral densities in a metaarray by the total power
+    in freq_range.
+
+    Args:
+        marray:
+            A metaarray of power spectral densities to normalize.
+        freq_range:
+            The start and stop frequency over which powers are measured.
+
+    Returns:
+        A new metaarray of normalized power spectral densities.
+    """
+
+    x = copy.deepcopy(marray)
+    axis = list(x.coords.keys()).index('frequencies')
+    freqs = np.array(x.coords['frequencies'])
+    normed = metrics.power_norm(
+                x.data,
+                freqs,
+                start=freq_range[0],
+                stop=freq_range[1],
+                axis=axis)
+    x.data = normed
+    return x
 
 if __name__ == '__main__':
 
@@ -227,8 +256,17 @@ if __name__ == '__main__':
     state_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/spindle/spindle_csv/'
     save_dir = '/media/matt/DataD/Xue/EbbData/6_week_post/standard/'
 
-    results = batch(eeg_dir, state_dir)
-    marray = as_metaarray(results, savedir=save_dir)
+    # batch compute psds and save to a metaarray
+    #results = batch(eeg_dir, state_dir)
+    #marray = as_metaarray(results, savedir=save_dir)
+
+    # compute and save a normalized metaarray
+    metapath = ('/media/matt/Zeus/STXBP1_High_Dose_Exps_3/'
+                'standard/psd_metaarray.pkl')
+    metapath = Path(metapath)
+    marray = metastores.MetaArray.load(metapath)
+    normed = normalize(marray, freq_range=[0, 40])
+    normed.save(metapath.parent.joinpath('normed_psd_metaarray.pkl'))
 
     """For testing save results out as dicts.
     r = [asdict(result) for result in results]
@@ -236,4 +274,3 @@ if __name__ == '__main__':
     with open(fp, 'wb') as outfile:
         pickle.dump(r, outfile)
     """
-    
