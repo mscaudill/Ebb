@@ -10,6 +10,7 @@ import copy
 import csv
 import itertools
 import pickle
+import time
 from dataclasses import asdict, dataclass
 from functools import partial
 from pathlib import Path
@@ -142,7 +143,7 @@ class Parameterizer:
             return
         x = self.read()
         self.to_save = {idx: Fitted(**fitdict) for idx, fitdict in x.items()}
-        self.idx = list(self.to_save.keys())[-1] + 1
+        self.idx = min(list(self.to_save.keys())[-1] + 1, len(self.items) - 1)
         print(f'Parameterizer populated with presaved fits from\n{self.target}')
 
     def read(self):
@@ -296,9 +297,30 @@ class Parameterizer:
 
         # plot the FOOOF model's fit
         for idx, (name, model) in enumerate(self.models.items()):
-            model.plot(plot_peaks='dot', plt_log=True, ax=self.axarr[idx])
+            #model.plot(plot_peaks='dot', plt_log=True, ax=self.axarr[idx])
+            log_freqs = np.log10(model.freqs)
+            aperiodic_model = model.get_model('aperiodic', 'log')
+            aperiodic_data = model.get_data('aperiodic', 'log')
+            self.axarr[idx].plot(log_freqs, aperiodic_model,
+                    color='b', label='aperiodic fit', alpha=0.5, linewidth=3,
+                    linestyle='--')
+            self.axarr[idx].plot(log_freqs, aperiodic_data,
+                                 color='k', label='aperiodic data')
+
+            # Plot the knee value as a vertical bar
+            if idx > 0:
+                knee = model.get_params('aperiodic_params', 'knee')
+                if knee > model.freq_range[0]:
+                    exp = model.get_params('aperiodic_params', 'exponent')
+                    knee_freq = np.log10(knee**(1/exp))
+                    ylim = self.axarr[idx].get_ylim()
+                    self.axarr[idx].vlines(knee_freq, *ylim, color='r', alpha=0.5,
+                                           linewidth=3)
+
+            # add titles and legend
             title = f'{name.upper()} Fit R^2 = {model.r_squared_:.4f}'
             self.axarr[idx].set_title(title)
+            self.axarr[idx].legend()
 
         # configure plots and update item info
         self.axarr[-1].legend().set_visible(False)
@@ -316,4 +338,4 @@ if __name__ == '__main__':
 
     # target=None view only mode
     target = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/fits/foof_fits.pkl'
-    param = Parameterizer(marr, (4,100), target=None, peak_width_limits=(2,10))
+    param = Parameterizer(marr, (4, 40), target=None, peak_width_limits=(2,20))
