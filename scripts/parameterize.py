@@ -338,4 +338,4 @@ if __name__ == '__main__':
 
     # target=None view only mode
     target = '/media/matt/Zeus/STXBP1_High_Dose_Exps_3/fits/foof_fits.pkl'
-    param = Parameterizer(marr, (4, 40), target=None, peak_width_limits=(2,20))
+    param = Parameterizer(marr, (4, 100), target=target, peak_width_limits=(2,20))
