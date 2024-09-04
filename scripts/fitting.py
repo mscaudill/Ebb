@@ -16,7 +16,8 @@ import numpy as np
 from fooof import FOOOF
 from matplotlib import widgets
 
-from ripple.psds import PSDResult
+from ebb.scripts.psds import PSDResult
+#from ripple.psds import PSDResult
 
 
 class Parameterizer:
@@ -50,9 +51,10 @@ class Parameterizer:
     def __init__(
         self,
         path: Union[str, Path],
+        target: Union[str, Path],
         peak_width_limits: Tuple[float, float] = (1, 5),
         max_n_peaks: Optional[int] = np.inf,
-        min_peak_height: float = 0,
+        min_peak_height: float = 0.1,
         peak_threshold: float = 2,
         aperiodic_mode: str = 'fixed',
         freq_range: Tuple[float, float] = (2, 100),
@@ -67,6 +69,7 @@ class Parameterizer:
         self.path = path
         with open(path, 'rb') as infile:
             self.results = [PSDResult(**attrs) for attrs in pickle.load(infile)]
+        self.target = Path(target)
 
         self.default_params = {
                 'peak_width_limits': peak_width_limits,
@@ -93,6 +96,7 @@ class Parameterizer:
         self.init_figure(figsize)
         self.add_forward()
         self.add_reverse()
+        self.add_counter()
         self.add_entry()
         self.add_cycle_up()
         self.add_cycle_down()
@@ -162,13 +166,13 @@ class Parameterizer:
 
         if self.save:
             self.write()
-            print(f'PSD Results at {self.path} updated with fits')
+            print(f'PSD Results at {self.target} updated with fits')
 
     def write(self):
         """Writes the PSDResult instances back to this Parameterizer's path."""
 
         dics = [dataclasses.asdict(r) for r in self.results]
-        with open(self.path, 'wb') as outfile:
+        with open(self.target, 'wb') as outfile:
             pickle.dump(dics, outfile)
 
     def add_yscale(self):
@@ -237,7 +241,7 @@ class Parameterizer:
         PSD and FOOOF fit."""
 
         # build container axis, add widget and set callback
-        self.forward_ax = plt.axes([0.9, .05, .04, 0.08])
+        self.forward_ax = plt.axes([0.9, .1, .04, 0.08])
         self.forward_button = widgets.Button(self.forward_ax, '>')
         self.forward_button.label.set_fontsize(32)
         self.forward_button.on_clicked(self.forward)
@@ -245,6 +249,11 @@ class Parameterizer:
     def forward(self, event):
         """On forward button press advance this Parameterizers plot & metadata
         information. """
+
+        # if current result is the last result forward declares it to be fit
+        if self.result_index == len(self.results) - 1:
+            self.result.is_fit = True
+            self.update()
 
         # declare the previous result as fit and increment to next result
         self.result.is_fit = True
@@ -258,10 +267,26 @@ class Parameterizer:
         and FOOOF fit."""
 
         # build container axis, add widget and set callback
-        self.reverse_ax = plt.axes([0.85, .05, .04, 0.08])
+        self.reverse_ax = plt.axes([0.85, .1, .04, 0.08])
         self.reverse_button = widgets.Button(self.reverse_ax, '<')
         self.reverse_button.label.set_fontsize(32)
         self.reverse_button.on_clicked(self.reverse)
+
+    def add_counter(self):
+        """Configures a text widget for reporting the result index of all
+        results currently being viewed."""
+
+        label = f'{self.result_index + 1}/{len(self.results)}'
+        self.counter_text = plt.text(.87, .05, label, size=10,
+                                     transform=self.fig.transFigure)
+
+    def update_counter(self):
+        """Updates the counter to report the result ind4ex of all results
+        currently being viewed."""
+
+        label = f'{self.result_index}/{len(self.results)-1}'
+        self.counter_text.set_text(label)
+
 
     def reverse(self, event):
         """On reverse button press decrement this Parameterizer's index to
@@ -437,7 +462,6 @@ class Parameterizer:
             - A change in the Result to plot
         """
 
-        #[print(fit, end='\n') for fit in self.result.fits]
         # clear previous drawn lines and construct new models
         self.clear()
 
@@ -485,10 +509,15 @@ class Parameterizer:
         tabular = np.round(models[self.psd_index].get_params('peak_params'), 2)
         self.update_table(tabular)
 
+        #update the counter
+        self.update_counter()
+
         plt.draw()
 
 
 if __name__ == '__main__':
 
     p = '/media/matt/Magnus/Qi/psds.pkl'
-    param = Parameterizer(p, save=False)
+    target = '/media/matt/Magnus/Qi/psds_highfreq.pkl'
+    param = Parameterizer(p, target, freq_range=(2, 30), save=False,
+                          peak_width_limits=(1,5))
