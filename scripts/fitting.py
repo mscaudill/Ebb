@@ -16,8 +16,8 @@ import numpy as np
 from fooof import FOOOF
 from matplotlib import widgets
 
-from ebb.scripts.psds import PSDResult
-#from ripple.psds import PSDResult
+#from ebb.scripts.psds import PSDResult
+from ripple.psds import PSDResult
 
 
 class Parameterizer:
@@ -519,5 +519,5 @@ if __name__ == '__main__':
 
     p = '/media/matt/Magnus/Qi/psds.pkl'
     target = '/media/matt/Magnus/Qi/psds_highfreq.pkl'
-    param = Parameterizer(p, target, freq_range=(2, 30), save=False,
+    param = Parameterizer(p, target, freq_range=(30, 100), save=False,
                           peak_width_limits=(1,5))
